@@ -1,22 +1,22 @@
 {
-  "name": "Import4UI",
+  "name": "catgen",
   "version": "0.0.0",
-  "description": "UI for Import4 migration script",
+  "description": "Generates cats. Name em. Neat.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zenoss/import4ui"
+    "url": ""
   },
-  "author": "John Matos",
   "devDependencies": {
-    "gulp": "~3.8.11",
-    "gulp-sourcemaps": "~1.5.1",
-    "gulp-concat": "~2.5.2",
-    "run-sequence": "~1.0.2",
-    "node-sass": "~3.1.2",
-    "gulp-sass": "~2.0.1",
-    "gulp-livereload": "~3.8.0",
-    "gulp-autoprefixer": "~2.3.0",
-    "babel": "~5.6.12",
-    "gulp-babel": "~5.1.0"
+    "globule": "^1.0.0",
+    "gulp": "~3.9.0",
+    "gulp-concat": "~2.6.0",
+    "gulp-livereload": "~3.8.1",
+    "gulp-sequence": "~0.4.1",
+    "gulp-sourcemaps": "~1.6.0",
+    "rollup-plugin-includepaths": "^0.1.5",
+    "rollup-stream": "^1.9.0",
+    "through2": "^2.0.1",
+    "vinyl-buffer": "^1.0.0",
+    "vinyl-source-stream": "^1.1.0"
   }
 }

@@ -1,71 +1,119 @@
-/*****************************************************************************
- * 
- * Copyright (C) Zenoss, Inc. 2015, all rights reserved.
- * 
- * This content is made available according to terms specified in
- * License.zenoss under the directory where your Zenoss product is installed.
- * 
- ****************************************************************************/
+/* jshint node: true */
 
-/* globals require: true, __dirname: true */
-/* jshint multistr: true */
+"use strict";
 
 var gulp = require("gulp"),
-    babel = require("gulp-babel"),
     concat = require("gulp-concat"),
-    sourcemaps = require("gulp-sourcemaps"),
-    sequence = require("run-sequence"),
-    sass = require("gulp-sass"),
     livereload = require("gulp-livereload"),
-    autoprefixer = require("gulp-autoprefixer");
+    sourcemaps = require("gulp-sourcemaps"),
+    source = require("vinyl-source-stream"),
+    buffer = require("vinyl-buffer"),
+    sequence = require("gulp-sequence"),
+    serv = require("./serv"),
+    exec = require("child_process").exec,
+    globule = require("globule"),
+    rollup = require("rollup-stream"),
+    rollupIncludePaths = require("rollup-plugin-includepaths"),
+    fs = require("fs"),
+    through = require("through2");
 
 var paths = {
     src: "src/",
     build: "build/",
-    css: "scss/",
+    www: "www/",
 };
 
-var mainLib = [
-    paths.src +"app.js",
-];
+var appName = "app",
+    entrypoint = paths.src + appName + ".js";
 
-var babelConfig = {
-    blacklist: ["react"],
-    comments: false
-};
+gulp.task("default", ["deploy"]);
 
-gulp.task("default", function(){
-    sequence("babel", "css", function(){});
+// build app and copy it to www dir
+gulp.task("deploy", ["build", "copy"]);
+
+// build js and css
+gulp.task("build", function(callback){
+    sequence("buildJS", "buildCSS")(callback);
 });
 
-gulp.task("babel", function(){
-    return gulp.src(mainLib)
-        .pipe(sourcemaps.init())
-            .pipe(concat("app.js"))
-            .pipe(babel(babelConfig))
-        .pipe(sourcemaps.write("./", { sourceRoot: "src" }))
-        .pipe(gulp.dest(paths.build))
-        .pipe(livereload());
+// bundle all js from src dir
+gulp.task("buildJS", function(){
+    return rollup({
+        entry: entrypoint,
+        sourceMap: true,
+        moduleName: appName,
+        format: "iife",
+        plugins: [
+            // hacky workaround for make sure rollup
+            // knows where to look for deps
+            rollupIncludePaths({
+                paths: [
+                    paths.src
+                    // TODO - recursively grab js from paths.src
+                ]
+            })
+        ]
+    })
+    .pipe(source(appName + ".js", paths.src))
+    .pipe(buffer())
+    .pipe(sourcemaps.init({loadMaps: true}))
+    .pipe(sourcemaps.write("."))
+    .pipe(gulp.dest(paths.build));
 });
 
-gulp.task("css", function(){
-    return gulp.src(paths.css +"index.scss", {sourceMap: "sass", sourceComments: "map"})
-        .pipe(sass.sync().on("error", sass.logError))
-        .pipe(autoprefixer())
-        .pipe(gulp.dest(paths.build +"assets/"))
-        .pipe(livereload());
+// bundle all css from src dir
+gulp.task("buildCSS", function(cb){
+    return gulp.src(paths.src + "**/*.css")
+        .pipe(concat(appName + ".css"))
+        .pipe(gulp.dest(paths.build));
 });
 
-gulp.task("watch", function(){
+// copy all necessary resources into www
+gulp.task("copy", function(callback){
+    sequence("copyHTML", "copyBuild")(callback);
+});
+
+// copy all html files from src into www
+gulp.task("copyHTML", function(){
+    return gulp.src([paths.src + "*.html"])
+        .pipe(gulp.dest(paths.www));
+});
+
+// copy all built files into www
+gulp.task("copyBuild", function(){
+    return gulp.src(paths.build + "*")
+        .pipe(gulp.dest(paths.www));
+});
+
+// livereload the demo page
+gulp.task("reload", function(){
+    livereload.reload();
+});
+
+// bring up a server pointing to www dir
+// with livereload
+gulp.task("watch", ["deploy"], function(){
+    var port = 3006,
+        hostname = "localhost";
+
     livereload.listen();
 
-    // concat js
-    gulp.watch(paths.src + "**/*.js", function(){
-        sequence("babel", function(){});
-    });
+    // rebuild the js and css and copy the new files
+    gulp.watch(paths.src + "**/*.js", ["deploy"]);
+    gulp.watch(paths.src + "**/*.css", ["deploy"]);
 
-    // scss
-    gulp.watch(paths.css + "**/*.scss", function(){
-        sequence("css", function(){});
+    // copy "static" stuff
+    gulp.watch(paths.webapp + "**/*.html", ["copy"]);
+    // TODO - images
+
+    // start webserver
+    serv(paths.www, port);
+
+    // open in browser
+    // TODO - reuse existing tab
+    exec("xdg-open http://"+ hostname +":"+ port, function(err, stdout, stderr){
+        if(err){
+            console.error("Huh...", stdout, stderr);
+        }
     });
 });
